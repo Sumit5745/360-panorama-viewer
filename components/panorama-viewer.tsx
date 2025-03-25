@@ -73,7 +73,26 @@ export function PanoramaViewer({
         script.onload = () => {
           if (window.pannellum && viewerRef.current) {
             console.log('Initializing viewer with image:', imageUrl);
-            const newViewer = window.pannellum.viewer(viewerRef.current, {
+            
+            // Create scenes configuration
+            const scenesConfig = scenes?.reduce((acc, scene) => ({
+              ...acc,
+              [scene.id]: {
+                title: scene.title,
+                panorama: scene.imageUrl,
+                hotSpots: scene.hotspots?.map(hotspot => ({
+                  pitch: hotspot.pitch,
+                  yaw: hotspot.yaw,
+                  type: hotspot.type,
+                  text: hotspot.text,
+                  sceneId: hotspot.sceneId,
+                  imageUrl: hotspot.imageUrl,
+                })),
+              }
+            }), {});
+
+            // Create viewer configuration
+            const viewerConfig = {
               type: 'equirectangular',
               panorama: imageUrl,
               title: title,
@@ -89,6 +108,12 @@ export function PanoramaViewer({
               autoLoad: true,
               autoRotate: -2,
               compassOffset: initialHeading || 0,
+              sceneFadeDuration: 1000,
+              default: {
+                firstScene: scenes?.[0]?.id || 'default',
+                sceneFadeDuration: 1000,
+              },
+              scenes: scenesConfig,
               onLoad: () => {
                 console.log('Panorama loaded successfully');
                 setIsLoading(false);
@@ -98,7 +123,14 @@ export function PanoramaViewer({
                 setError('Failed to load panorama. Please try again.');
                 setIsLoading(false);
               },
-            });
+              onScenechange: (sceneId: string) => {
+                console.log('Scene changed to:', sceneId);
+                setCurrentScene(sceneId);
+                setIsLoading(false);
+              }
+            };
+
+            const newViewer = window.pannellum.viewer(viewerRef.current, viewerConfig);
             setViewer(newViewer);
           }
         };
@@ -110,9 +142,13 @@ export function PanoramaViewer({
         }
 
         return () => {
+          if (viewerRef.current) {
+            viewerRef.current.innerHTML = '';
+          }
           document.body.removeChild(script);
           document.head.removeChild(link);
           window.removeEventListener('deviceorientation', handleOrientation);
+          setIsLoading(false);
         };
       } catch (err) {
         console.error('Viewer initialization error:', err);
@@ -122,7 +158,7 @@ export function PanoramaViewer({
     };
 
     loadPanoramaViewer();
-  }, [imageUrl, title, hotspots, initialHeading]);
+  }, [imageUrl, title, hotspots, scenes, initialHeading]);
 
   const handleOrientation = (event: DeviceOrientationEvent) => {
     if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
@@ -136,8 +172,15 @@ export function PanoramaViewer({
 
   const handleSceneChange = (sceneId: string) => {
     if (viewer) {
-      viewer.loadScene(sceneId, 0, 0);
-      setCurrentScene(sceneId);
+      setIsLoading(true);
+      try {
+        viewer.loadScene(sceneId, 0, 0);
+        setCurrentScene(sceneId);
+      } catch (err) {
+        console.error('Error changing scene:', err);
+        setError('Failed to change scene. Please try again.');
+        setIsLoading(false);
+      }
     }
   };
 
@@ -174,29 +217,29 @@ export function PanoramaViewer({
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      )}
+          </div>
+        )}
 
       <div ref={viewerRef} className="w-full h-[500px]" />
 
       {/* Controls */}
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
-        <Button
+          <Button
           variant="secondary"
-          size="icon"
+            size="icon"
           onClick={() => handleMove('left')}
           className="bg-primary/90 hover:bg-primary"
-        >
+          >
           ←
-        </Button>
-        <Button
+          </Button>
+          <Button
           variant="secondary"
-          size="icon"
+            size="icon"
           onClick={() => handleMove('right')}
           className="bg-primary/90 hover:bg-primary"
-        >
+          >
           →
-        </Button>
+          </Button>
         <Button
           variant="secondary"
           size="icon"
@@ -217,12 +260,12 @@ export function PanoramaViewer({
 
       {/* Scene Thumbnails */}
       {showThumbnails && scenes && (
-        <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
+        <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm p-2 rounded-lg max-h-[80vh] overflow-y-auto">
           <div className="flex flex-col gap-2">
             {scenes.map((scene) => (
               <div
                 key={scene.id}
-                className={`relative w-20 h-20 cursor-pointer rounded-lg overflow-hidden ${
+                className={`relative w-20 h-20 cursor-pointer rounded-lg overflow-hidden transition-all duration-200 hover:scale-105 ${
                   currentScene === scene.id ? 'ring-2 ring-primary' : ''
                 }`}
                 onClick={() => handleSceneChange(scene.id)}
@@ -231,7 +274,15 @@ export function PanoramaViewer({
                   src={scene.thumbnail || scene.imageUrl}
                   alt={scene.title}
                   className="w-full h-full object-cover"
+                  loading="lazy"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = scene.imageUrl; // Fallback to main image if thumbnail fails
+                  }}
                 />
+                <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                  <span className="text-white text-xs text-center px-1">{scene.title}</span>
+                </div>
               </div>
             ))}
           </div>
