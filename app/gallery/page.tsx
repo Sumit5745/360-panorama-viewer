@@ -10,9 +10,17 @@ import { categories, panoramas } from '../data/panoramas';
 import dynamic from 'next/dynamic';
 import { Search, Filter } from 'lucide-react';
 
-const PanoramaViewer = dynamic(() => import('@/components/panorama-viewer'), {
-  ssr: false,
-});
+const PanoramaViewer = dynamic(
+  () => import('@/components/panorama-viewer').then((mod) => mod.PanoramaViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-screen flex items-center justify-center bg-black">
+        <div className="text-white">Loading panorama viewer...</div>
+      </div>
+    ),
+  }
+);
 
 export default function GalleryPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -26,6 +34,10 @@ export default function GalleryPage() {
       panorama.location.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const selectedPanoramaData = selectedPanorama 
+    ? panoramas.find(p => p.id === selectedPanorama)
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black">
@@ -61,16 +73,21 @@ export default function GalleryPage() {
             <TabsTrigger value="all" className="data-[state=active]:bg-gray-800">
               All
             </TabsTrigger>
-            {categories.map((category) => (
-              <TabsTrigger
-                key={category.id}
-                value={category.id}
-                className="data-[state=active]:bg-gray-800"
-              >
-                <span className="mr-2">{category.icon}</span>
-                {category.title}
-              </TabsTrigger>
-            ))}
+            {categories.map((category) => {
+              const Icon = category.icon;
+              return (
+                <TabsTrigger
+                  key={category.id}
+                  value={category.id}
+                  className="data-[state=active]:bg-gray-800"
+                >
+                  <span className="mr-2">
+                    {Icon && <Icon className="h-4 w-4" />}
+                  </span>
+                  {category.title}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -84,12 +101,22 @@ export default function GalleryPage() {
               >
                 <Card className="bg-gray-800/50 border-gray-700 overflow-hidden group">
                   <div className="relative aspect-video">
-                    <Image
-                      src={panorama.thumbnail}
-                      alt={panorama.title}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105"
-                    />
+                    {panorama.thumbnail || panorama.imageUrl ? (
+                      <Image
+                        src={panorama.thumbnail || panorama.imageUrl}
+                        alt={panorama.title}
+                        fill
+                        className="object-cover transition-transform group-hover:scale-105"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = panorama.imageUrl;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-800/50 flex items-center justify-center">
+                        <span className="text-gray-400">No image available</span>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Button
                         variant="secondary"
@@ -108,7 +135,14 @@ export default function GalleryPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">{panorama.location}</span>
                       <span className="text-sm text-gray-400">
-                        {categories.find(c => c.id === panorama.category)?.icon}
+                        {(() => {
+                          const category = categories.find(c => c.id === panorama.category);
+                          if (category) {
+                            const Icon = category.icon;
+                            return Icon && <Icon className="h-4 w-4" />;
+                          }
+                          return null;
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -121,7 +155,7 @@ export default function GalleryPage() {
 
       {/* Panorama Viewer Modal */}
       <AnimatePresence>
-        {selectedPanorama && (
+        {selectedPanoramaData && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -136,8 +170,11 @@ export default function GalleryPage() {
               Close
             </Button>
             <PanoramaViewer
-              initialPanorama={panoramas.find(p => p.id === selectedPanorama)}
-              onPanoramaChange={(panorama) => setSelectedPanorama(panorama.id)}
+              imageUrl={selectedPanoramaData.imageUrl}
+              title={selectedPanoramaData.title}
+              hotspots={selectedPanoramaData.hotspots}
+              initialLatitude={selectedPanoramaData.latitude}
+              initialLongitude={selectedPanoramaData.longitude}
             />
           </motion.div>
         )}

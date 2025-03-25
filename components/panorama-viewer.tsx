@@ -1,155 +1,64 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import Image from "next/image";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Volume2, 
-  VolumeX, 
-  Maximize, 
-  ZoomIn, 
-  ZoomOut, 
-  RotateCcw, 
-  Compass,
-  Map,
-  X,
-  Loader2,
-  Headset,
-  Smartphone
-} from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Slider } from '@/components/ui/slider';
-import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
-import dynamic from 'next/dynamic';
+import { X, Camera, Compass, MapPin, Info, Loader2 } from 'lucide-react';
+import { AROverlay } from '@/components/ar-overlay';
+import { Hotspot, Scene, Panorama } from '@/app/data/panoramas';
 
-// Prevent SSR for Pannellum-related code
+// Pannellum type declarations
+interface PannellumViewer {
+  loadScene: (sceneId: string, pitch?: number, yaw?: number) => void;
+  getYaw: () => number;
+  lookTo: (yaw: number, pitch: number, duration: number) => void;
+}
+
 declare global {
   interface Window {
     pannellum: {
-      viewer: (containerId: string, config: any) => any;
+      viewer: (container: HTMLElement, config: any) => PannellumViewer;
     };
   }
 }
 
-// Sample panorama data with reliable demo images
-const panoramas = [
-  {
-    id: 1,
-    title: "Mountain View",
-    demoUrl: "https://raw.githubusercontent.com/mpetroff/pannellum/master/examples/examplepano.jpg",
-    thumbnail: "/thumbnails/mountain.jpg",
-    hotspots: [
-      { id: 1, title: "Mountain Peak", position: { yaw: 5, pitch: -5 } },
-      { id: 2, title: "Valley", position: { yaw: 150, pitch: -8 } },
-      { id: 3, title: "Forest", position: { yaw: 270, pitch: -10 } },
-    ],
-  },
-  {
-    id: 2,
-    title: "Beach Panorama",
-    demoUrl: "https://raw.githubusercontent.com/mpetroff/pannellum/master/examples/examplepano2.jpg",
-    thumbnail: "/thumbnails/beach.jpg",
-    hotspots: [
-      { id: 1, title: "Ocean View", position: { yaw: 120, pitch: -5 } },
-      { id: 2, title: "Palm Trees", position: { yaw: 200, pitch: 0 } },
-    ],
-  },
-];
-
-interface NavigationArrowProps {
-  direction: 'left' | 'right';
-  onClick: () => void;
-}
-
-const NavigationArrow = ({ direction, onClick }: NavigationArrowProps) => {
-  return (
-    <motion.div
-      className={cn(
-        "absolute top-1/2 -translate-y-1/2 z-10",
-        direction === 'left' ? "left-4" : "right-4"
-      )}
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
-    >
-      <Button
-        variant="secondary"
-        size="lg"
-        className="bg-black/30 hover:bg-black/50 backdrop-blur-sm rounded-full w-12 h-12"
-        onClick={onClick}
-      >
-        {direction === 'left' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
-      </Button>
-    </motion.div>
-  );
-};
-
-interface HotspotPosition {
-  yaw: number;
-  pitch: number;
-}
-
-interface Hotspot {
-  id: number;
-  title: string;
-  position: HotspotPosition;
-}
-
-interface Panorama {
-  id: number;
-  title: string;
-  demoUrl: string;
-  thumbnail: string;
-  hotspots: Hotspot[];
-}
-
 interface PanoramaViewerProps {
   imageUrl: string;
-  title?: string;
-  hotspots?: Array<{
-    pitch: number;
-    yaw: number;
-    text: string;
-    type?: string;
-  }>;
+  title: string;
+  hotspots: Hotspot[];
+  scenes?: Scene[];
+  initialLatitude?: number;
+  initialLongitude?: number;
+  initialHeading?: number;
 }
 
-export function PanoramaViewer({ imageUrl, title, hotspots = [] }: PanoramaViewerProps) {
+export function PanoramaViewer({
+  imageUrl,
+  title,
+  hotspots,
+  scenes,
+  initialLatitude,
+  initialLongitude,
+  initialHeading,
+}: PanoramaViewerProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [viewer, setViewer] = useState<any>(null);
-  const [isVRMode, setIsVRMode] = useState(false);
-  const [isARMode, setIsARMode] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showCompass, setShowCompass] = useState(true);
-  const [showMiniMap, setShowMiniMap] = useState(false);
-  const [rotationSpeed, setRotationSpeed] = useState(-2);
-  const [hasMounted, setHasMounted] = useState(false);
+  const [currentScene, setCurrentScene] = useState<string | null>(null);
+  const [showAR, setShowAR] = useState(false);
+  const [showThumbnails, setShowThumbnails] = useState(false);
+  const [deviceOrientation, setDeviceOrientation] = useState<{
+    alpha: number;
+    beta: number;
+    gamma: number;
+  } | null>(null);
+  const [viewer, setViewer] = useState<PannellumViewer | null>(null);
 
   useEffect(() => {
-    setHasMounted(true);
-    return () => {
-      if (viewer?.destroy) {
-        viewer.destroy();
-      }
-    };
-  }, [viewer]);
-
-  useEffect(() => {
-    if (!hasMounted) return;
-
-    const loadPannellum = async () => {
+    const loadPanoramaViewer = async () => {
       try {
-        // Load Pannellum script
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js';
-        script.async = true;
-        document.head.appendChild(script);
+        setIsLoading(true);
+        setError(null);
 
         // Load Pannellum CSS
         const link = document.createElement('link');
@@ -157,251 +66,185 @@ export function PanoramaViewer({ imageUrl, title, hotspots = [] }: PanoramaViewe
         link.href = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css';
         document.head.appendChild(link);
 
+        // Load Pannellum viewer
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js';
+        script.async = true;
         script.onload = () => {
-          initViewer();
+          if (window.pannellum && viewerRef.current) {
+            console.log('Initializing viewer with image:', imageUrl);
+            const newViewer = window.pannellum.viewer(viewerRef.current, {
+              type: 'equirectangular',
+              panorama: imageUrl,
+              title: title,
+              hotSpots: hotspots.map(hotspot => ({
+                pitch: hotspot.pitch,
+                yaw: hotspot.yaw,
+                type: hotspot.type,
+                text: hotspot.text,
+                sceneId: hotspot.sceneId,
+                imageUrl: hotspot.imageUrl,
+              })),
+              compass: true,
+              autoLoad: true,
+              autoRotate: -2,
+              compassOffset: initialHeading || 0,
+              onLoad: () => {
+                console.log('Panorama loaded successfully');
+                setIsLoading(false);
+              },
+              onError: (err: any) => {
+                console.error('Panorama loading error:', err);
+                setError('Failed to load panorama. Please try again.');
+                setIsLoading(false);
+              },
+            });
+            setViewer(newViewer);
+          }
+        };
+        document.body.appendChild(script);
+
+        // Handle device orientation
+        if (window.DeviceOrientationEvent) {
+          window.addEventListener('deviceorientation', handleOrientation);
+        }
+
+        return () => {
+          document.body.removeChild(script);
+          document.head.removeChild(link);
+          window.removeEventListener('deviceorientation', handleOrientation);
         };
       } catch (err) {
-        setError('Failed to load panorama viewer');
+        console.error('Viewer initialization error:', err);
+        setError('Failed to initialize panorama viewer. Please try again.');
         setIsLoading(false);
       }
     };
 
-    loadPannellum();
-  }, [hasMounted, imageUrl]);
+    loadPanoramaViewer();
+  }, [imageUrl, title, hotspots, initialHeading]);
 
-  const initViewer = () => {
-    if (!viewerRef.current || !imageUrl) return;
-
-    try {
-      const containerId = `pannellum-${Date.now()}`;
-      viewerRef.current.id = containerId;
-
-      const viewerInstance = window.pannellum.viewer(containerId, {
-        type: 'equirectangular',
-        panorama: imageUrl,
-        autoLoad: true,
-        hotSpots: hotspots,
-        title: title,
-        preview: imageUrl,
-        showControls: true,
-        compass: showCompass,
-        autoRotate: rotationSpeed,
-        onLoad: () => {
-          setIsLoading(false);
-          setLoadingProgress(100);
-        },
-        onProgress: (progress: number) => {
-          setLoadingProgress(Math.round(progress * 100));
-        },
-        onError: (err: string) => {
-          setError(err);
-          setIsLoading(false);
-        }
+  const handleOrientation = (event: DeviceOrientationEvent) => {
+    if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
+      setDeviceOrientation({
+        alpha: event.alpha,
+        beta: event.beta,
+        gamma: event.gamma,
       });
-
-      setViewer(viewerInstance);
-    } catch (err) {
-      setError('Failed to initialize panorama viewer');
-      setIsLoading(false);
     }
   };
 
-  const handleZoom = (direction: 'in' | 'out') => {
-    if (!viewer) return;
-    
-    const currentHfov = viewer.getHfov();
-    const newHfov = direction === 'in' ? 
-      Math.max(currentHfov - 10, 30) : // Minimum zoom (maximum magnification)
-      Math.min(currentHfov + 10, 120); // Maximum zoom (minimum magnification)
-    
-    viewer.setHfov(newHfov);
-  };
-
-  const handleRotationSpeedChange = (value: number[]) => {
-    const speed = value[0];
-    setRotationSpeed(speed);
+  const handleSceneChange = (sceneId: string) => {
     if (viewer) {
-      viewer.setAutoRotate(speed);
+      viewer.loadScene(sceneId, 0, 0);
+      setCurrentScene(sceneId);
     }
   };
 
-  const toggleFullscreen = () => {
-    if (!viewerRef.current) return;
-
-    if (!isFullscreen) {
-      if (viewerRef.current.requestFullscreen) {
-        viewerRef.current.requestFullscreen();
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    }
-  };
-
-  const toggleAudio = () => {
-    setIsAudioMuted(!isAudioMuted);
-  };
-
-  const toggleVR = () => {
-    if (!viewer) return;
-    setIsVRMode(!isVRMode);
-    if (!isVRMode) {
-      if ('xr' in navigator) {
-        viewer.startVR?.();
-      } else {
-        alert('WebXR not supported in your browser');
-      }
-    } else {
-      viewer.stopVR?.();
+  const handleMove = (direction: 'left' | 'right') => {
+    if (viewer) {
+      const currentYaw = viewer.getYaw();
+      const newYaw = direction === 'left' ? currentYaw - 45 : currentYaw + 45;
+      viewer.lookTo(newYaw, 0, 1000);
     }
   };
 
   const toggleAR = () => {
-    if (!viewer) return;
-    setIsARMode(!isARMode);
-    if (!isARMode) {
-      if ('xr' in navigator) {
-        viewer.startAR?.();
-      } else {
-        alert('WebXR not supported in your browser');
-      }
-    } else {
-      viewer.stopAR?.();
-    }
+    setShowAR(!showAR);
   };
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+  const toggleThumbnails = () => {
+    setShowThumbnails(!showThumbnails);
+  };
 
   if (error) {
     return (
-      <Card className="p-4 text-center text-red-500">
-        <p>Error: {error}</p>
-        <p className="text-sm mt-2">Please make sure a valid panorama image URL is provided.</p>
-      </Card>
+      <div className="w-full h-[500px] bg-card/50 rounded-lg flex items-center justify-center">
+        <div className="text-center">
+          <Info className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="relative w-full h-[500px] rounded-lg overflow-hidden" ref={viewerRef}>
-      {/* Title Bar */}
-      {title && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-black/30 backdrop-blur-sm px-4 py-2 rounded-lg"
-        >
-          <h2 className="text-white text-lg font-semibold">{title}</h2>
-        </motion.div>
+    <div className="relative w-full h-full">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
       )}
 
-      {/* Controls Overlay */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/30 backdrop-blur-sm p-2 rounded-lg"
-      >
+      <div ref={viewerRef} className="w-full h-[500px]" />
+
+      {/* Controls */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
-          onClick={() => handleZoom('in')}
-          className="text-white hover:bg-white/20"
-          title="Zoom In"
+          onClick={() => handleMove('left')}
+          className="bg-primary/90 hover:bg-primary"
         >
-          <ZoomIn size={20} />
+          ←
         </Button>
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
-          onClick={() => handleZoom('out')}
-          className="text-white hover:bg-white/20"
-          title="Zoom Out"
+          onClick={() => handleMove('right')}
+          className="bg-primary/90 hover:bg-primary"
         >
-          <ZoomOut size={20} />
-        </Button>
-        <div className="h-6 w-px bg-white/20" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowCompass(!showCompass)}
-          className={cn("text-white hover:bg-white/20", showCompass && "bg-white/20")}
-          title="Toggle Compass"
-        >
-          <Compass size={20} />
+          →
         </Button>
         <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowMiniMap(!showMiniMap)}
-          className={cn("text-white hover:bg-white/20", showMiniMap && "bg-white/20")}
-          title="Toggle Mini Map"
-        >
-          <Map size={20} />
-        </Button>
-        <div className="h-6 w-px bg-white/20" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleVR}
-          className={cn("text-white hover:bg-white/20", isVRMode && "bg-white/20")}
-          title="VR Mode"
-        >
-          <Headset size={20} />
-        </Button>
-        <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           onClick={toggleAR}
-          className={cn("text-white hover:bg-white/20", isARMode && "bg-white/20")}
-          title="AR Mode"
+          className={`${showAR ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
         >
-          <Smartphone size={20} />
-        </Button>
-        <div className="h-6 w-px bg-white/20" />
-        <div className="flex items-center gap-2 px-2">
-          <RotateCcw size={16} className="text-white" />
-          <Slider
-            value={[rotationSpeed]}
-            min={-5}
-            max={5}
-            step={1}
-            className="w-24"
-            onValueChange={handleRotationSpeedChange}
-          />
-        </div>
-        <div className="h-6 w-px bg-white/20" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleAudio}
-          className="text-white hover:bg-white/20"
-        >
-          {isAudioMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          <Camera className="w-5 h-5" />
         </Button>
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
-          onClick={toggleFullscreen}
-          className="text-white hover:bg-white/20"
-          title="Toggle Fullscreen"
+          onClick={toggleThumbnails}
+          className={`${showThumbnails ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
         >
-          <Maximize size={20} />
+          <Compass className="w-5 h-5" />
         </Button>
-      </motion.div>
+      </div>
 
-      {/* Loading Progress */}
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-          <p className="text-white font-medium">{loadingProgress}% Loading...</p>
+      {/* Scene Thumbnails */}
+      {showThumbnails && scenes && (
+        <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
+          <div className="flex flex-col gap-2">
+            {scenes.map((scene) => (
+              <div
+                key={scene.id}
+                className={`relative w-20 h-20 cursor-pointer rounded-lg overflow-hidden ${
+                  currentScene === scene.id ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => handleSceneChange(scene.id)}
+              >
+                <img
+                  src={scene.thumbnail || scene.imageUrl}
+                  alt={scene.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
         </div>
+      )}
+
+      {/* AR Overlay */}
+      {showAR && (
+        <AROverlay
+          latitude={initialLatitude}
+          longitude={initialLongitude}
+          heading={deviceOrientation?.alpha || initialHeading || 0}
+        />
       )}
     </div>
   );

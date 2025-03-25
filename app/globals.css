@@ -236,3 +236,29 @@
   @apply bg-primary/20 rounded-full hover:bg-primary/40;
 }
 
+/* Fix Leaflet marker icons */
+.leaflet-default-icon-path {
+  background-image: url(https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png);
+}
+
+.leaflet-default-shadow-path {
+  background-image: url(https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png);
+}
+
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  background-image: url(https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png);
+  background-size: 25px 41px;
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+  margin-left: -12px;
+  margin-top: -41px;
+}
+
+.leaflet-marker-shadow {
+  background-image: url(https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png);
+  background-size: 41px 41px;
+  margin-left: -12px;
+  margin-top: -41px;
+}
+

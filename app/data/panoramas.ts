@@ -1,15 +1,75 @@
-import { Camera, Compass, Map, VrHeadset, Smartphone, Volume2 } from 'lucide-react';
+import { Camera, Map, Info, Compass, Globe, ArrowRight } from "lucide-react";
 
-export interface HotspotPosition {
+export const categories = [
+  {
+    id: "ar",
+    title: "AR Experience",
+    description: "View panoramas in augmented reality",
+    icon: Camera,
+  },
+  {
+    id: "location",
+    title: "Location Based",
+    description: "Explore panoramas based on your location",
+    icon: Map,
+  },
+  {
+    id: "info",
+    title: "Information",
+    description: "Learn about the locations you visit",
+    icon: Info,
+  },
+];
+
+export const features = [
+  {
+    title: "360° Views",
+    description: "Explore stunning panoramic views in every direction",
+    icon: Globe,
+  },
+  {
+    title: "AR Navigation",
+    description: "Use your device's camera to navigate through locations",
+    icon: Camera,
+  },
+  {
+    title: "Interactive Hotspots",
+    description: "Click on points of interest to learn more",
+    icon: Map,
+  },
+  {
+    title: "Location Tracking",
+    description: "Find nearby panoramas based on your location",
+    icon: Compass,
+  },
+  {
+    title: "Detailed Information",
+    description: "Learn about the history and significance of each location",
+    icon: Info,
+  },
+  {
+    title: "Easy Navigation",
+    description: "Intuitive controls for smooth exploration",
+    icon: ArrowRight,
+  },
+];
+
+export interface Hotspot {
+  id: string;
   pitch: number;
   yaw: number;
+  type: "info" | "scene" | "custom";
+  text: string;
+  sceneId?: string;
+  imageUrl?: string;
 }
 
-export interface Hotspot extends HotspotPosition {
-  text: string;
-  type?: 'info' | 'scene' | 'link';
-  sceneId?: string;
-  link?: string;
+export interface Scene {
+  id: string;
+  title: string;
+  imageUrl: string;
+  thumbnail?: string;
+  hotspots: Hotspot[];
 }
 
 export interface Panorama {
@@ -17,157 +77,284 @@ export interface Panorama {
   title: string;
   description: string;
   imageUrl: string;
-  thumbnailUrl?: string;
+  thumbnail?: string;
   category: string;
-  hotspots?: Hotspot[];
   latitude?: number;
   longitude?: number;
-  initialView?: {
-    pitch: number;
-    yaw: number;
-    hfov: number;
-  };
+  hotspots: Hotspot[];
+  scenes?: Scene[];
 }
-
-export interface Category {
-  id: string;
-  title: string;
-  description: string;
-  icon: any;
-}
-
-export const categories: Category[] = [
-  {
-    id: 'nature',
-    title: 'Nature',
-    description: 'Explore breathtaking natural landscapes',
-    icon: Compass,
-  },
-  {
-    id: 'architecture',
-    title: 'Architecture',
-    description: 'Discover amazing architectural wonders',
-    icon: Camera,
-  },
-  {
-    id: 'cities',
-    title: 'Cities',
-    description: 'Experience vibrant city panoramas',
-    icon: Map,
-  },
-];
 
 export const panoramas: Panorama[] = [
   {
-    id: 'mountain-vista',
-    title: 'Mountain Vista',
-    description: 'A stunning view of snow-capped mountains and valleys',
-    imageUrl: 'https://pannellum.org/images/cerro-toco-0.jpg',
-    thumbnailUrl: 'https://pannellum.org/images/cerro-toco-0-thumb.jpg',
-    category: 'nature',
+    id: "mountain-peak",
+    title: "Mountain Peak",
+    description: "Experience the breathtaking view from the mountain peak",
+    imageUrl:
+      "https://images.unsplash.com/photo-1506906731076-74ed55d96f8a?auto=format&fit=crop&w=2048&q=80",
+    thumbnail:
+      "https://images.unsplash.com/photo-1506906731076-74ed55d96f8a?auto=format&fit=crop&w=400&q=80",
+    category: "ar",
+    latitude: 40.7128,
+    longitude: -74.006,
     hotspots: [
       {
-        pitch: -0.6,
-        yaw: 37.1,
-        text: 'Peak Summit',
-        type: 'info',
-      },
-      {
-        pitch: -1.1,
-        yaw: 67.2,
-        text: 'Valley View',
-        type: 'info',
-      },
-    ],
-    latitude: -22.908333,
-    longitude: -67.775,
-    initialView: {
-      pitch: -0.9,
-      yaw: 12.0,
-      hfov: 90,
-    },
-  },
-  {
-    id: 'ancient-temple',
-    title: 'Ancient Temple',
-    description: 'An ancient temple with intricate architecture',
-    imageUrl: 'https://pannellum.org/images/alma.jpg',
-    thumbnailUrl: 'https://pannellum.org/images/alma-thumb.jpg',
-    category: 'architecture',
-    hotspots: [
-      {
-        pitch: -0.6,
-        yaw: 37.1,
-        text: 'Main Entrance',
-        type: 'info',
-      },
-      {
-        pitch: -1.1,
-        yaw: 67.2,
-        text: 'Virtual Tour',
-        type: 'link',
-        link: '/tour/temple',
-      },
-    ],
-    initialView: {
-      pitch: 0,
-      yaw: 180,
-      hfov: 100,
-    },
-  },
-  {
-    id: 'city-square',
-    title: 'City Square',
-    description: 'A bustling city square with historic buildings',
-    imageUrl: 'https://pannellum.org/images/bma-1.jpg',
-    thumbnailUrl: 'https://pannellum.org/images/bma-1-thumb.jpg',
-    category: 'cities',
-    hotspots: [
-      {
+        id: "peak-info",
         pitch: 0,
         yaw: 0,
-        text: 'City Hall',
-        type: 'info',
+        type: "info",
+        text: "Welcome to the Mountain Peak! This location offers stunning 360° views of the surrounding landscape.",
+      },
+      {
+        id: "north-view",
+        pitch: 0,
+        yaw: 0,
+        type: "scene",
+        text: "View to the North",
+        sceneId: "north-view",
+      },
+      {
+        id: "south-view",
+        pitch: 0,
+        yaw: 180,
+        type: "scene",
+        text: "View to the South",
+        sceneId: "south-view",
       },
     ],
-    initialView: {
-      pitch: -5,
-      yaw: 0,
-      hfov: 100,
-    },
+    scenes: [
+      {
+        id: "north-view",
+        title: "North View",
+        imageUrl:
+          "https://images.unsplash.com/photo-1506906731076-74ed55d96f8a?auto=format&fit=crop&w=2048&q=80",
+        thumbnail:
+          "https://images.unsplash.com/photo-1506906731076-74ed55d96f8a?auto=format&fit=crop&w=400&q=80",
+        hotspots: [
+          {
+            id: "back-to-main",
+            pitch: 0,
+            yaw: 180,
+            type: "scene",
+            text: "Back to Main View",
+            sceneId: "mountain-peak",
+          },
+        ],
+      },
+      {
+        id: "south-view",
+        title: "South View",
+        imageUrl:
+          "https://images.unsplash.com/photo-1506906731076-74ed55d96f8a?auto=format&fit=crop&w=2048&q=80",
+        thumbnail:
+          "https://images.unsplash.com/photo-1506906731076-74ed55d96f8a?auto=format&fit=crop&w=400&q=80",
+        hotspots: [
+          {
+            id: "back-to-main",
+            pitch: 0,
+            yaw: 0,
+            type: "scene",
+            text: "Back to Main View",
+            sceneId: "mountain-peak",
+          },
+        ],
+      },
+    ],
   },
-];
-
-export const features = [
   {
-    title: 'VR Mode',
-    description: 'Experience panoramas in virtual reality with VR headset support',
-    icon: VrHeadset,
+    id: "beach-sunset",
+    title: "Beach Sunset",
+    description: "Watch the beautiful sunset over the ocean",
+    imageUrl:
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=2048&q=80",
+    thumbnail:
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80",
+    category: "location",
+    latitude: 25.7617,
+    longitude: -80.1918,
+    hotspots: [
+      {
+        id: "beach-info",
+        pitch: 0,
+        yaw: 0,
+        type: "info",
+        text: "Welcome to the Beach! Enjoy the stunning sunset views and peaceful ocean waves.",
+      },
+      {
+        id: "palm-trees",
+        pitch: -10,
+        yaw: 45,
+        type: "info",
+        text: "Beautiful palm trees swaying in the breeze",
+        imageUrl:
+          "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80",
+      },
+      {
+        id: "ocean-view",
+        pitch: -5,
+        yaw: 180,
+        type: "info",
+        text: "Crystal clear waters of the ocean",
+        imageUrl:
+          "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80",
+      },
+    ],
   },
   {
-    title: 'AR View',
-    description: 'Augmented reality view using your device\'s sensors',
-    icon: Smartphone,
+    id: "city-skyline",
+    title: "City Skyline",
+    description: "Explore the vibrant city skyline",
+    imageUrl:
+      "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&w=2048&q=80",
+    thumbnail:
+      "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&w=400&q=80",
+    category: "info",
+    latitude: 40.7128,
+    longitude: -74.006,
+    hotspots: [
+      {
+        id: "city-info",
+        pitch: 0,
+        yaw: 0,
+        type: "info",
+        text: "Welcome to the City! Take in the stunning architecture and urban landscape.",
+      },
+      {
+        id: "landmark-1",
+        pitch: -10,
+        yaw: 45,
+        type: "info",
+        text: "Historic landmark with rich history",
+        imageUrl:
+          "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&w=400&q=80",
+      },
+      {
+        id: "landmark-2",
+        pitch: -5,
+        yaw: 180,
+        type: "info",
+        text: "Modern architectural marvel",
+        imageUrl:
+          "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&w=400&q=80",
+      },
+    ],
   },
   {
-    title: 'Motion Controls',
-    description: 'Navigate using device motion and orientation',
-    icon: Compass,
+    id: "forest-path",
+    title: "Forest Path",
+    description: "Walk through a serene forest path",
+    imageUrl:
+      "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=2048&q=80",
+    thumbnail:
+      "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80",
+    category: "location",
+    latitude: 45.5155,
+    longitude: -122.6789,
+    hotspots: [
+      {
+        id: "forest-info",
+        pitch: 0,
+        yaw: 0,
+        type: "info",
+        text: "Welcome to the Forest Path! Experience the tranquility of nature.",
+      },
+      {
+        id: "trees",
+        pitch: -10,
+        yaw: 45,
+        type: "info",
+        text: "Ancient trees creating a natural canopy",
+        imageUrl:
+          "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80",
+      },
+      {
+        id: "path",
+        pitch: -5,
+        yaw: 180,
+        type: "info",
+        text: "Winding path through the forest",
+        imageUrl:
+          "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80",
+      },
+    ],
   },
   {
-    title: 'Virtual Tours',
-    description: 'Take guided tours through connected panoramas',
-    icon: Map,
+    id: "desert-dunes",
+    title: "Desert Dunes",
+    description: "Explore the vast desert landscape",
+    imageUrl:
+      "https://images.unsplash.com/photo-1509316787929-025f5b846b35?auto=format&fit=crop&w=2048&q=80",
+    thumbnail:
+      "https://images.unsplash.com/photo-1509316787929-025f5b846b35?auto=format&fit=crop&w=400&q=80",
+    category: "ar",
+    latitude: 24.7136,
+    longitude: 46.6753,
+    hotspots: [
+      {
+        id: "desert-info",
+        pitch: 0,
+        yaw: 0,
+        type: "info",
+        text: "Welcome to the Desert Dunes! Experience the beauty of the desert landscape.",
+      },
+      {
+        id: "dunes",
+        pitch: -10,
+        yaw: 45,
+        type: "info",
+        text: "Majestic sand dunes stretching to the horizon",
+        imageUrl:
+          "https://images.unsplash.com/photo-1509316787929-025f5b846b35?auto=format&fit=crop&w=400&q=80",
+      },
+      {
+        id: "sunset",
+        pitch: -5,
+        yaw: 180,
+        type: "info",
+        text: "Stunning desert sunset",
+        imageUrl:
+          "https://images.unsplash.com/photo-1509316787929-025f5b846b35?auto=format&fit=crop&w=400&q=80",
+      },
+    ],
   },
   {
-    title: '3D Sound',
-    description: 'Immersive spatial audio experience',
-    icon: Volume2,
-  },
-  {
-    title: 'Live Weather',
-    description: 'Real-time weather integration for outdoor scenes',
-    icon: Camera,
+    id: "lake-view",
+    title: "Lake View",
+    description: "Enjoy the peaceful lake scenery",
+    imageUrl:
+      "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=2048&q=80",
+    thumbnail:
+      "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=400&q=80",
+    category: "location",
+    latitude: 44.428,
+    longitude: -110.5885,
+    hotspots: [
+      {
+        id: "lake-info",
+        pitch: 0,
+        yaw: 0,
+        type: "info",
+        text: "Welcome to the Lake! Take in the serene waters and surrounding nature.",
+      },
+      {
+        id: "mountains",
+        pitch: -10,
+        yaw: 45,
+        type: "info",
+        text: "Snow-capped mountains in the distance",
+        imageUrl:
+          "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=400&q=80",
+      },
+      {
+        id: "reflection",
+        pitch: -5,
+        yaw: 180,
+        type: "info",
+        text: "Perfect reflection on the lake's surface",
+        imageUrl:
+          "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=400&q=80",
+      },
+    ],
   },
 ];
 
@@ -176,11 +363,6 @@ export const viewModes = [
     id: "standard",
     title: "Standard View",
     icon: "🖥️",
-  },
-  {
-    id: "vr",
-    title: "VR Mode",
-    icon: "🥽",
   },
   {
     id: "ar",

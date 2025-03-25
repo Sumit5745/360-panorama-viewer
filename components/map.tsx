@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import type { Panorama } from '@/app/data/panoramas';
-
-// Replace with your Mapbox token
-mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN';
 
 interface MapProps {
   locations: Panorama[];
@@ -16,20 +13,22 @@ interface MapProps {
 
 export default function Map({ locations, selectedLocation, onLocationSelect }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<{ [key: number]: mapboxgl.Marker }>({});
+  const map = useRef<L.Map | null>(null);
+  const markers = useRef<{ [key: number]: L.Marker }>({});
   const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [0, 20],
-      zoom: 1.5,
-    });
+    // Initialize map
+    map.current = L.map(mapContainer.current).setView([20, 0], 1.5);
+    
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map.current);
 
+    // Set map loaded state
     map.current.on('load', () => {
       setMapLoaded(true);
     });
@@ -66,16 +65,24 @@ export default function Map({ locations, selectedLocation, onLocationSelect }: M
         onLocationSelect(location.id);
         
         // Fly to location
-        map.current?.flyTo({
-          center: [location.longitude, location.latitude],
-          zoom: 15,
-          duration: 2000,
-        });
+        map.current?.flyTo(
+          [location.latitude, location.longitude],
+          15,
+          {
+            duration: 2,
+            easeLinearity: 0.25
+          }
+        );
       });
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([location.longitude, location.latitude])
-        .addTo(map.current);
+      const marker = L.marker([location.latitude, location.longitude], {
+        icon: L.divIcon({
+          html: el.innerHTML,
+          className: 'custom-marker',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        })
+      }).addTo(map.current);
 
       markers.current[location.id] = marker;
     });
@@ -88,19 +95,25 @@ export default function Map({ locations, selectedLocation, onLocationSelect }: M
     const location = locations.find(l => l.id === selectedLocation);
     if (!location?.latitude || !location?.longitude) return;
 
-    map.current.flyTo({
-      center: [location.longitude, location.latitude],
-      zoom: 15,
-      duration: 2000,
-    });
+    map.current.flyTo(
+      [location.latitude, location.longitude],
+      15,
+      {
+        duration: 2,
+        easeLinearity: 0.25
+      }
+    );
   }, [selectedLocation, locations, mapLoaded]);
 
   return (
     <div ref={mapContainer} className="w-full h-full">
       <style jsx global>{`
-        .mapboxgl-ctrl-logo,
-        .mapboxgl-ctrl-bottom-right {
+        .leaflet-control-attribution {
           display: none !important;
+        }
+        .custom-marker {
+          background: none;
+          border: none;
         }
       `}</style>
     </div>
