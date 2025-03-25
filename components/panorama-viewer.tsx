@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { X, Camera, Compass, MapPin, Info, Loader2 } from 'lucide-react';
+import { X, Camera, Compass, MapPin, Info, Loader2, RefreshCw, Minimize, Maximize } from 'lucide-react';
 import { AROverlay } from '@/components/ar-overlay';
 import { Hotspot, Scene, Panorama } from '@/app/data/panoramas';
 
@@ -12,6 +12,10 @@ interface PannellumViewer {
   loadScene: (sceneId: string, pitch?: number, yaw?: number) => void;
   getYaw: () => number;
   lookTo: (yaw: number, pitch: number, duration: number) => void;
+  setYaw: (yaw: number) => void;
+  destroy: () => void;
+  setAutoRotate: (speed: number) => void;
+  setCompass: (show: boolean) => void;
 }
 
 declare global {
@@ -20,6 +24,16 @@ declare global {
       viewer: (container: HTMLElement, config: any) => PannellumViewer;
     };
   }
+}
+
+interface DeviceOrientationEventiOS extends DeviceOrientationEvent {
+  requestPermission?: () => Promise<'granted' | 'denied' | 'default'>;
+}
+
+interface DeviceOrientationEventWithAlpha extends DeviceOrientationEvent {
+  alpha: number | null;
+  beta: number | null;
+  gamma: number | null;
 }
 
 interface PanoramaViewerProps {
@@ -42,22 +56,24 @@ export function PanoramaViewer({
   initialHeading,
 }: PanoramaViewerProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentScene, setCurrentScene] = useState<string | null>(null);
   const [showAR, setShowAR] = useState(false);
+  const [showVR, setShowVR] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
-  const [deviceOrientation, setDeviceOrientation] = useState<{
-    alpha: number;
-    beta: number;
-    gamma: number;
-  } | null>(null);
+  const [deviceOrientation, setDeviceOrientation] = useState<DeviceOrientationEventWithAlpha | null>(null);
   const [viewer, setViewer] = useState<PannellumViewer | null>(null);
+  const [calibrationOffset, setCalibrationOffset] = useState<number>(0);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(true);
+  const [showCompass, setShowCompass] = useState(true);
+  const [isPanoramaLoaded, setIsPanoramaLoaded] = useState(false);
 
   useEffect(() => {
     const loadPanoramaViewer = async () => {
       try {
-        setIsLoading(true);
         setError(null);
 
         // Load Pannellum CSS
@@ -104,9 +120,9 @@ export function PanoramaViewer({
                 sceneId: hotspot.sceneId,
                 imageUrl: hotspot.imageUrl,
               })),
-              compass: true,
+              compass: showCompass,
               autoLoad: true,
-              autoRotate: -2,
+              autoRotate: autoRotate ? -2 : 0,
               compassOffset: initialHeading || 0,
               sceneFadeDuration: 1000,
               default: {
@@ -116,30 +132,46 @@ export function PanoramaViewer({
               scenes: scenesConfig,
               onLoad: () => {
                 console.log('Panorama loaded successfully');
-                setIsLoading(false);
+                setIsPanoramaLoaded(true);
               },
               onError: (err: any) => {
                 console.error('Panorama loading error:', err);
                 setError('Failed to load panorama. Please try again.');
-                setIsLoading(false);
               },
               onScenechange: (sceneId: string) => {
                 console.log('Scene changed to:', sceneId);
                 setCurrentScene(sceneId);
-                setIsLoading(false);
               }
             };
 
+            // Initialize viewer
             const newViewer = window.pannellum.viewer(viewerRef.current, viewerConfig);
             setViewer(newViewer);
+
+            // Handle device orientation
+            if (typeof window !== "undefined") {
+              const DeviceOrientationEventWithPermission = DeviceOrientationEvent as unknown as DeviceOrientationEventiOS;
+              const requestPermission = DeviceOrientationEventWithPermission.requestPermission;
+              
+              if (requestPermission) {
+                const handlePermission = async () => {
+                  try {
+                    const permission = await requestPermission();
+                    if (permission === "granted") {
+                      window.addEventListener("deviceorientation", handleOrientation);
+                    }
+                  } catch (error) {
+                    console.error("Error requesting device orientation permission:", error);
+                  }
+                };
+                handlePermission();
+              } else {
+                window.addEventListener("deviceorientation", handleOrientation);
+              }
+            }
           }
         };
         document.body.appendChild(script);
-
-        // Handle device orientation
-        if (window.DeviceOrientationEvent) {
-          window.addEventListener('deviceorientation', handleOrientation);
-        }
 
         return () => {
           if (viewerRef.current) {
@@ -148,56 +180,97 @@ export function PanoramaViewer({
           document.body.removeChild(script);
           document.head.removeChild(link);
           window.removeEventListener('deviceorientation', handleOrientation);
-          setIsLoading(false);
         };
       } catch (err) {
         console.error('Viewer initialization error:', err);
         setError('Failed to initialize panorama viewer. Please try again.');
-        setIsLoading(false);
       }
     };
 
     loadPanoramaViewer();
-  }, [imageUrl, title, hotspots, scenes, initialHeading]);
+  }, [imageUrl, title, hotspots, scenes, initialHeading, showCompass, autoRotate]);
 
-  const handleOrientation = (event: DeviceOrientationEvent) => {
-    if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
-      setDeviceOrientation({
-        alpha: event.alpha,
-        beta: event.beta,
-        gamma: event.gamma,
-      });
+  const handleOrientation = (event: DeviceOrientationEventWithAlpha) => {
+    setDeviceOrientation(event);
+    if (viewer && !isCalibrating && event.alpha !== null) {
+      const heading = event.alpha;
+      const calibratedHeading = (heading + calibrationOffset) % 360;
+      viewer.setYaw(calibratedHeading);
     }
   };
 
   const handleSceneChange = (sceneId: string) => {
     if (viewer) {
-      setIsLoading(true);
       try {
         viewer.loadScene(sceneId, 0, 0);
         setCurrentScene(sceneId);
       } catch (err) {
         console.error('Error changing scene:', err);
         setError('Failed to change scene. Please try again.');
-        setIsLoading(false);
       }
     }
   };
 
-  const handleMove = (direction: 'left' | 'right') => {
+  const handleMove = (yaw: number, pitch: number) => {
     if (viewer) {
-      const currentYaw = viewer.getYaw();
-      const newYaw = direction === 'left' ? currentYaw - 45 : currentYaw + 45;
-      viewer.lookTo(newYaw, 0, 1000);
+      viewer.lookTo(yaw, pitch, 1000);
     }
   };
 
   const toggleAR = () => {
     setShowAR(!showAR);
+    setShowVR(false);
+  };
+
+  const toggleVR = () => {
+    setShowVR(!showVR);
+    setShowAR(false);
   };
 
   const toggleThumbnails = () => {
     setShowThumbnails(!showThumbnails);
+  };
+
+  const handleCalibrate = () => {
+    const alpha = deviceOrientation?.alpha;
+    if (alpha !== null && alpha !== undefined) {
+      setCalibrationOffset((360 - alpha) % 360);
+      setIsCalibrating(false);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      viewerRef.current?.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  const toggleAutoRotate = () => {
+    setAutoRotate(!autoRotate);
+    if (viewer) {
+      viewer.setAutoRotate(autoRotate ? 0 : -2);
+    }
+  };
+
+  const toggleCompass = () => {
+    setShowCompass(!showCompass);
+    if (viewer) {
+      viewer.setCompass(!showCompass);
+    }
+  };
+
+  const handleMouseEnter = () => {
+    setShowControls(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isFullscreen) {
+      setShowControls(false);
+    }
   };
 
   if (error) {
@@ -213,50 +286,85 @@ export function PanoramaViewer({
   }
 
   return (
-    <div className="relative w-full h-full">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        )}
-
-      <div ref={viewerRef} className="w-full h-[500px]" />
+    <div 
+      className="relative w-full h-full"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div 
+        ref={viewerRef} 
+        className="w-full h-[500px]"
+      />
 
       {/* Controls */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
+      {showControls && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
           <Button
-          variant="secondary"
+            variant="secondary"
             size="icon"
-          onClick={() => handleMove('left')}
-          className="bg-primary/90 hover:bg-primary"
+            onClick={() => handleMove(viewer?.getYaw() || 0, 0)}
+            className="bg-primary/90 hover:bg-primary"
           >
-          ←
+            ←
           </Button>
           <Button
-          variant="secondary"
+            variant="secondary"
             size="icon"
-          onClick={() => handleMove('right')}
-          className="bg-primary/90 hover:bg-primary"
+            onClick={() => handleMove(viewer?.getYaw() || 0, 90)}
+            className="bg-primary/90 hover:bg-primary"
           >
-          →
+            →
           </Button>
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={toggleAR}
-          className={`${showAR ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
-        >
-          <Camera className="w-5 h-5" />
-        </Button>
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={toggleThumbnails}
-          className={`${showThumbnails ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
-        >
-          <Compass className="w-5 h-5" />
-        </Button>
-      </div>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleAR}
+            className={`${showAR ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
+          >
+            <Camera className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleVR}
+            className={`${showVR ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
+          >
+            <MapPin className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleThumbnails}
+            className={`${showThumbnails ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
+          >
+            <Compass className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleAutoRotate}
+            className={`${autoRotate ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
+          >
+            <RefreshCw className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleCompass}
+            className={`${showCompass ? 'bg-primary' : 'bg-primary/90 hover:bg-primary'}`}
+          >
+            <Compass className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleFullscreen}
+            className="bg-primary/90 hover:bg-primary"
+          >
+            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          </Button>
+        </div>
+      )}
 
       {/* Scene Thumbnails */}
       {showThumbnails && scenes && (
@@ -277,7 +385,7 @@ export function PanoramaViewer({
                   loading="lazy"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = scene.imageUrl; // Fallback to main image if thumbnail fails
+                    target.src = scene.imageUrl;
                   }}
                 />
                 <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
@@ -289,12 +397,17 @@ export function PanoramaViewer({
         </div>
       )}
 
-      {/* AR Overlay */}
-      {showAR && (
+      {/* AR/VR Overlay */}
+      {(showAR || showVR) && (
         <AROverlay
           latitude={initialLatitude}
           longitude={initialLongitude}
           heading={deviceOrientation?.alpha || initialHeading || 0}
+          mode={showAR ? 'ar' : 'vr'}
+          onClose={() => {
+            setShowAR(false);
+            setShowVR(false);
+          }}
         />
       )}
     </div>

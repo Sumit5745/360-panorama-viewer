@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { categories, panoramas } from '../data/panoramas';
 import dynamic from 'next/dynamic';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PanoramaViewer = dynamic(
   () => import('@/components/panorama-viewer').then((mod) => mod.PanoramaViewer),
@@ -26,14 +28,31 @@ export default function GalleryPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPanorama, setSelectedPanorama] = useState<number | null>(null);
+  const [filteredPanoramas, setFilteredPanoramas] = useState(panoramas);
 
-  const filteredPanoramas = panoramas.filter((panorama) => {
-    const matchesCategory = selectedCategory === 'all' || panorama.category === selectedCategory;
-    const matchesSearch = panorama.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      panorama.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      panorama.location.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Get unique categories
+  const uniqueCategories = ["all", ...new Set(panoramas.map((p) => p.category))];
+
+  // Filter panoramas based on search and category
+  useEffect(() => {
+    let filtered = panoramas;
+
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (panorama) =>
+          panorama.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          panorama.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter((panorama) => panorama.category === selectedCategory);
+    }
+
+    setFilteredPanoramas(filtered);
+  }, [searchQuery, selectedCategory]);
 
   const selectedPanoramaData = selectedPanorama 
     ? panoramas.find(p => p.id === selectedPanorama)
@@ -47,9 +66,9 @@ export default function GalleryPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h1 className="text-3xl font-bold text-white">Panorama Gallery</h1>
             <div className="flex items-center gap-4">
-              <div className="relative">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
+                <Input
                   type="text"
                   placeholder="Search panoramas..."
                   value={searchQuery}
@@ -57,10 +76,31 @@ export default function GalleryPage() {
                   className="bg-gray-800/50 text-white pl-10 pr-4 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500 w-full md:w-64"
                 />
               </div>
-              <Button variant="outline" className="text-white border-gray-700">
-                <Filter size={20} className="mr-2" />
-                Filters
-              </Button>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueCategories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(searchQuery || selectedCategory !== 'all') && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('all');
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Clear Filters
+                </Button>
+              )}
             </div>
           </div>
         </div>

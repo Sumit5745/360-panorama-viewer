@@ -6,10 +6,11 @@ interface AROverlayProps {
   latitude?: number;
   longitude?: number;
   heading?: number;
+  mode?: 'ar' | 'vr';
   onClose?: () => void;
 }
 
-export function AROverlay({ latitude, longitude, heading, onClose }: AROverlayProps) {
+export function AROverlay({ latitude, longitude, heading = 0, mode = 'ar', onClose }: AROverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasPermission, setHasPermission] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +58,9 @@ export function AROverlay({ latitude, longitude, heading, onClose }: AROverlayPr
       }
     };
 
-    requestCameraPermission();
+    if (mode === 'ar') {
+      requestCameraPermission();
+    }
 
     if (window.DeviceOrientationEvent) {
       window.addEventListener('deviceorientation', handleOrientation);
@@ -74,7 +77,7 @@ export function AROverlay({ latitude, longitude, heading, onClose }: AROverlayPr
       window.removeEventListener('deviceorientation', handleOrientation);
       window.removeEventListener('devicemotion', handleMotion);
     };
-  }, []);
+  }, [mode]);
 
   const handleCalibrate = () => {
     setIsCalibrating(true);
@@ -94,8 +97,12 @@ export function AROverlay({ latitude, longitude, heading, onClose }: AROverlayPr
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-black/30">
         <div className="flex items-center gap-2">
-          <Camera className="w-5 h-5 text-white" />
-          <h3 className="text-white font-semibold">AR Mode</h3>
+          {mode === 'ar' ? (
+            <Camera className="w-5 h-5 text-white" />
+          ) : (
+            <MapPin className="w-5 h-5 text-white" />
+          )}
+          <h3 className="text-white font-semibold">{mode.toUpperCase()} Mode</h3>
         </div>
         {onClose && (
           <Button
@@ -109,26 +116,36 @@ export function AROverlay({ latitude, longitude, heading, onClose }: AROverlayPr
         )}
       </div>
 
-      {/* Camera Feed */}
+      {/* Camera Feed or VR Content */}
       <div className="flex-1 relative">
-        {!hasPermission ? (
+        {mode === 'ar' ? (
+          !hasPermission ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+              <div className="text-center">
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <p className="text-white mb-4">{error || 'Requesting camera access...'}</p>
+                <Button onClick={() => window.location.reload()}>Retry</Button>
+              </div>
+            </div>
+          ) : (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          )
+        ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80">
             <div className="text-center">
-              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <p className="text-white mb-4">{error || 'Requesting camera access...'}</p>
-              <Button onClick={() => window.location.reload()}>Retry</Button>
+              <MapPin className="w-12 h-12 text-primary mx-auto mb-4" />
+              <p className="text-white mb-4">VR Mode Enabled</p>
+              <p className="text-sm text-white/60">Use your VR headset to view the panorama</p>
             </div>
           </div>
-        ) : (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="w-full h-full object-cover"
-          />
         )}
 
-        {/* AR Overlay */}
+        {/* AR/VR Overlay Controls */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Compass */}
           <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
