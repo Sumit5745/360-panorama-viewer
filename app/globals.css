@@ -1,0 +1,238 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    --radius: 0.75rem;
+  }
+
+  [data-theme="dark"] {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    @apply antialiased;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  #__next {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Custom Pannellum Styles */
+.custom-hotspot {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 16px !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.custom-hotspot:hover {
+  background: rgba(0, 0, 0, 0.7) !important;
+  transform: scale(1.1) !important;
+}
+
+.hotspot-tooltip {
+  position: absolute !important;
+  bottom: 100% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin-bottom: 8px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.custom-hotspot:hover .hotspot-tooltip {
+  opacity: 1 !important;
+}
+
+/* Pulse animation for hotspots */
+.custom-hotspot::before {
+  content: "" !important;
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  background-color: rgba(255, 204, 0, 0.5) !important;
+  animation: pulse 2s infinite !important;
+  z-index: -1 !important;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.pnlm-hotspot-base {
+  opacity: 1 !important;
+}
+
+.pnlm-tooltip {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  white-space: nowrap !important;
+  font-weight: 500 !important;
+  color: white !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Override some Pannellum defaults */
+.pnlm-container {
+  background: #000 !important;
+}
+
+/* Loading indicator styles */
+.pnlm-load-button {
+  display: none !important;
+}
+
+/* Ensure consistent rendering */
+#panorama-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 400px !important;
+  background-color: black !important;
+  position: relative !important;
+}
+
+.pnlm-load-box {
+  @apply !bg-background/80 !backdrop-blur-sm !border-primary/20 !text-foreground;
+}
+
+.pnlm-load-box p {
+  @apply !text-foreground;
+}
+
+.pnlm-ui div {
+  @apply !font-sans;
+}
+
+.pnlm-controls {
+  @apply !opacity-0 transition-opacity duration-300;
+}
+
+.pannellum-container:hover .pnlm-controls {
+  @apply !opacity-100;
+}
+
+.pnlm-compass {
+  @apply !opacity-0 transition-opacity duration-300;
+}
+
+.pannellum-container:hover .pnlm-compass {
+  @apply !opacity-100;
+}
+
+.pnlm-hotspot {
+  @apply !bg-primary/80 !border-2 !border-white/20 !backdrop-blur-sm;
+}
+
+.pnlm-tooltip {
+  @apply !bg-background/90 !backdrop-blur-sm !border !border-primary/20 !text-foreground !font-sans !rounded-lg !px-3 !py-2;
+}
+
+@layer components {
+  .loading-spinner {
+    @apply w-10 h-10 border-4 border-primary/20 border-l-primary rounded-full animate-spin;
+  }
+}
+
+.pannellum-container {
+  @apply rounded-lg overflow-hidden;
+}
+
+/* Card Hover Effects */
+.card-hover {
+  @apply transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/20;
+}
+
+/* Button Hover Effects */
+.button-hover {
+  @apply transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-primary/20;
+}
+
+/* Gradient Text */
+.gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-foreground;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/20 rounded-full hover:bg-primary/40;
+}
+
